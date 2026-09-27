@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getArticlesByAuthor, getAuthorBySlug } from "../../lib/data";
+import { getArticlesByProfile, getProfileBySlug } from "../../lib/data";
 import { Eyebrow, Shell, StoryCard } from "../../components/site";
 
 export const dynamic = "force-dynamic";
@@ -7,12 +7,12 @@ export const dynamic = "force-dynamic";
 const founderSlug = "dhrithi-shashibushan";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const author = await getAuthorBySlug(founderSlug);
-  return author ? { title: author.name, description: author.seoDescription ?? author.bio } : {};
+  const profile = await getProfileBySlug(founderSlug);
+  return profile ? { title: profile.name, description: profile.seoDescription ?? profile.bio } : {};
 }
 
 export default async function AuthorPage() {
-  const [author, stories] = await Promise.all([getAuthorBySlug(founderSlug), getArticlesByAuthor(founderSlug)]);
+  const [author, stories] = await Promise.all([getProfileBySlug(founderSlug), getArticlesByProfile(founderSlug)]);
   const fallbackName = "Dhrithi Shashibushan";
   const displayName = author?.name || fallbackName;
   const initials = displayName.split(" ").map(part => part[0]).join("");

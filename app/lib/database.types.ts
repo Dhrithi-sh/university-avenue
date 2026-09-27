@@ -29,18 +29,6 @@ type SectionRow = Timestamps & {
   is_active: boolean;
 };
 
-type AuthorRow = Timestamps & {
-  id: string;
-  slug: string;
-  name: string;
-  role_title: string;
-  bio: string;
-  photo_url: string | null;
-  email: string | null;
-  seo_description: string | null;
-  is_public: boolean;
-};
-
 type ArticleRow = Timestamps & {
   id: string;
   slug: string;
@@ -53,8 +41,7 @@ type ArticleRow = Timestamps & {
   image_url: string | null;
   image_alt: string | null;
   section_id: string;
-  author_id: string | null;
-  owner_profile_id: string | null;
+  owner_profile_id: string;
   is_featured: boolean;
   sort_order: number;
   is_sample: boolean;
@@ -108,10 +95,14 @@ type ProfileRow = Timestamps & {
   slug: string;
   bio: string;
   avatar_url: string | null;
+  role_title: string;
+  seo_description: string | null;
+  is_public: boolean;
   role: ProfileRole;
   status: ProfileStatus;
-  author_id: string | null;
 };
+
+type PublicProfileRow = Pick<ProfileRow, "id" | "slug" | "display_name" | "bio" | "avatar_url" | "role_title" | "seo_description">;
 
 type ArticleReviewNoteRow = {
   id: string;
@@ -126,18 +117,15 @@ export interface Database {
   public: {
     Tables: {
       sections: Table<SectionRow, "slug" | "name">;
-      authors: Table<AuthorRow, "slug" | "name">;
       profiles: Table<
         ProfileRow,
-        "id" | "display_name" | "slug",
-        [{ foreignKeyName: "profiles_author_id_fkey"; columns: ["author_id"]; isOneToOne: false; referencedRelation: "authors"; referencedColumns: ["id"] }]
+        "id" | "display_name" | "slug"
       >;
       article_review_notes: Table<ArticleReviewNoteRow, "article_id" | "reviewer_profile_id" | "decision">;
       articles: Table<
         ArticleRow,
-        "slug" | "title" | "dek" | "section_id",
+        "slug" | "title" | "dek" | "section_id" | "owner_profile_id",
         [
-          { foreignKeyName: "articles_author_id_fkey"; columns: ["author_id"]; isOneToOne: false; referencedRelation: "authors"; referencedColumns: ["id"] },
           { foreignKeyName: "articles_section_id_fkey"; columns: ["section_id"]; isOneToOne: false; referencedRelation: "sections"; referencedColumns: ["id"] },
           { foreignKeyName: "articles_owner_profile_id_fkey"; columns: ["owner_profile_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] },
         ]
@@ -145,11 +133,10 @@ export interface Database {
       events: Table<EventRow, "slug" | "title" | "event_date" | "category">;
       opportunities: Table<OpportunityRow, "slug" | "title" | "category" | "organization" | "description">;
     };
-    Views: Record<string, never>;
+    Views: { public_profiles: { Row: PublicProfileRow; Relationships: [] } };
     Functions: {
       submit_article_for_review: { Args: { target_article_id: string }; Returns: undefined };
-      editorial_review_article: { Args: { target_article_id: string; decision: string; target_author_id?: string | null; reviewer_note?: string | null }; Returns: undefined };
-      set_contributor_author: { Args: { target_profile_id: string; target_author_id: string | null }; Returns: undefined };
+      editorial_review_article: { Args: { target_article_id: string; decision: string; reviewer_note?: string | null }; Returns: undefined };
       delete_editorial_article: { Args: { target_article_id: string }; Returns: undefined };
       is_editorial_story_section: { Args: { target_section_id: string }; Returns: boolean };
     };

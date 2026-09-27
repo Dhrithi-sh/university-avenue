@@ -1,16 +1,14 @@
 import { cache } from "react";
 import { createSupabaseServerClient } from "./supabase/server";
 import type { Tables } from "./database.types";
-import type { Event, Opportunity, Person, Section, Story } from "./types";
+import type { ContributorProfile, Event, Opportunity, Section, Story } from "./types";
 
-type ArticleRelations = {
-  author: Pick<Tables<"authors">, "name" | "slug" | "is_public">;
-  section: Pick<Tables<"sections">, "name" | "slug" | "is_active">;
-};
+type ArticleRelations = { section: Pick<Tables<"sections">, "name" | "slug" | "is_active"> };
+type PublicProfile = { id: string; slug: string; display_name: string; role_title: string; bio: string; avatar_url: string | null; seo_description: string | null };
 
-type ArticleRecord = Pick<Tables<"articles">, "id" | "slug" | "title" | "dek" | "excerpt" | "body" | "published_at" | "read_time_minutes" | "image_url" | "image_alt" | "is_featured" | "seo_title" | "seo_description"> & ArticleRelations;
+type ArticleRecord = Pick<Tables<"articles">, "id" | "slug" | "title" | "dek" | "excerpt" | "body" | "published_at" | "read_time_minutes" | "image_url" | "image_alt" | "is_featured" | "seo_title" | "seo_description" | "owner_profile_id"> & ArticleRelations;
 
-const articleColumns = "id,slug,title,dek,excerpt,body,published_at,read_time_minutes,image_url,image_alt,is_featured,seo_title,seo_description,author:authors!articles_author_id_fkey!inner(name,slug,is_public),section:sections!articles_section_id_fkey!inner(name,slug,is_active)";
+const articleColumns = "id,slug,title,dek,excerpt,body,published_at,read_time_minutes,image_url,image_alt,is_featured,seo_title,seo_description,owner_profile_id,section:sections!articles_section_id_fkey!inner(name,slug,is_active)";
 
 function reportQueryError(dataset: string, error: unknown) {
   console.error(`[University Avenue] Could not load ${dataset}:`, error);
@@ -20,7 +18,7 @@ function reportQueryError(dataset: string, error: unknown) {
   }
 }
 
-function toStory(row: ArticleRecord): Story {
+function toStory(row: ArticleRecord, profile: PublicProfile): Story {
   const paragraphs = Array.isArray(row.body) ? row.body.filter((paragraph): paragraph is string => typeof paragraph === "string") : [];
   const date = row.published_at ? new Date(row.published_at) : null;
 
@@ -33,8 +31,8 @@ function toStory(row: ArticleRecord): Story {
     read: row.read_time_minutes ? `${row.read_time_minutes} min read` : "",
     image: row.image_url ?? "",
     imageAlt: row.image_alt ?? "",
-    author: row.author.name,
-    authorSlug: row.author.slug,
+    author: profile.display_name,
+    authorSlug: profile.slug,
     body: paragraphs,
     featured: row.is_featured,
     seoTitle: row.seo_title,
@@ -42,8 +40,30 @@ function toStory(row: ArticleRecord): Story {
   };
 }
 
-function toPerson(row: Tables<"authors">): Person {
-  return { slug: row.slug, name: row.name, role: row.role_title, bio: row.bio, photo: row.photo_url, email: row.email, seoDescription: row.seo_description };
+function toContributorProfile(row: PublicProfile): ContributorProfile {
+  return { slug: row.slug, name: row.display_name, role: row.role_title, bio: row.bio, photo: row.avatar_url, seoDescription: row.seo_description };
+}
+
+async function toStories(rows: ArticleRecord[]): Promise<Story[]> {
+  const profileIds = [...new Set(rows.flatMap(row => row.owner_profile_id ? [row.owner_profile_id] : []))];
+  if (!profileIds.length) return [];
+  const supabase = createSupabaseServerClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("public_profiles").select("id,slug,display_name,role_title,bio,avatar_url,seo_description").in("id", profileIds);
+  if (error) { reportQueryError("public contributor profiles", error); return []; }
+  const profiles = new Map((data ?? []).map(profile => [profile.id, profile as PublicProfile]));
+  return rows.flatMap(row => {
+    const profile = row.owner_profile_id ? profiles.get(row.owner_profile_id) : undefined;
+    return profile ? [toStory(row, profile)] : [];
+  });
+}
+
+async function getPublicProfile(slug: string): Promise<PublicProfile | null> {
+  const supabase = createSupabaseServerClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("public_profiles").select("id,slug,display_name,role_title,bio,avatar_url,seo_description").eq("slug", slug).maybeSingle();
+  if (error) { reportQueryError(`public profile ${slug}`, error); return null; }
+  return data as PublicProfile | null;
 }
 
 function toEvent(row: Tables<"events">): Event {
@@ -95,10 +115,10 @@ export const getPublishedArticles = cache(async (): Promise<Story[]> => {
   try {
     const { data, error } = await supabase.from("articles").select(articleColumns)
       .eq("status", "published")
-      .eq("author.is_public", true).eq("section.is_active", true)
+      .not("owner_profile_id", "is", null).eq("section.is_active", true)
       .order("sort_order", { ascending: true });
     if (error) { reportQueryError("articles", error); return []; }
-    return data.map(row => toStory(row));
+    return toStories(data);
   } catch (error) {
     reportQueryError("articles", { message: error instanceof Error ? error.message : "unexpected database error" });
     return [];
@@ -112,10 +132,10 @@ export const getFeaturedArticles = cache(async (limit = 4): Promise<Story[]> => 
   try {
     const { data, error } = await supabase.from("articles").select(articleColumns)
       .eq("status", "published").eq("is_featured", true)
-      .eq("author.is_public", true).eq("section.is_active", true)
+      .not("owner_profile_id", "is", null).eq("section.is_active", true)
       .order("sort_order", { ascending: true }).limit(limit);
     if (error) { reportQueryError("featured articles", error); return []; }
-    return data.map(row => toStory(row));
+    return toStories(data);
   } catch (error) {
     reportQueryError("featured articles", { message: error instanceof Error ? error.message : "unexpected database error" });
     return [];
@@ -129,9 +149,9 @@ export const getArticleBySlug = cache(async (slug: string): Promise<Story | null
   try {
     const { data, error } = await supabase.from("articles").select(articleColumns)
       .eq("slug", slug).eq("status", "published")
-      .eq("author.is_public", true).eq("section.is_active", true).maybeSingle();
+      .not("owner_profile_id", "is", null).eq("section.is_active", true).maybeSingle();
     if (error) { reportQueryError(`article ${slug}`, error); return null; }
-    return data ? toStory(data) : null;
+    return data ? (await toStories([data]))[0] ?? null : null;
   } catch (error) {
     reportQueryError(`article ${slug}`, { message: error instanceof Error ? error.message : "unexpected database error" });
     return null;
@@ -145,57 +165,53 @@ export const getArticlesForSection = cache(async (slug: string): Promise<Story[]
   try {
     const { data, error } = await supabase.from("articles").select(articleColumns)
       .eq("status", "published").eq("section.slug", slug)
-      .eq("author.is_public", true).eq("section.is_active", true)
+      .not("owner_profile_id", "is", null).eq("section.is_active", true)
       .order("sort_order", { ascending: true });
     if (error) { reportQueryError(`articles for ${slug}`, error); return []; }
-    return data.map(row => toStory(row));
+    return toStories(data);
   } catch (error) {
     reportQueryError(`articles for ${slug}`, { message: error instanceof Error ? error.message : "unexpected database error" });
     return [];
   }
 });
 
-export const getArticlesByAuthor = cache(async (slug: string): Promise<Story[]> => {
-  const supabase = createSupabaseServerClient();
-  if (!supabase) return [];
-
+export const getArticlesByProfile = cache(async (slug: string): Promise<Story[]> => {
   try {
+    const profile = await getPublicProfile(slug);
+    if (!profile) return [];
+    const supabase = createSupabaseServerClient();
+    if (!supabase) return [];
     const { data, error } = await supabase.from("articles").select(articleColumns)
-      .eq("status", "published").eq("author.slug", slug)
-      .eq("author.is_public", true).eq("section.is_active", true)
+      .eq("status", "published").eq("owner_profile_id", profile.id).eq("section.is_active", true)
       .order("sort_order", { ascending: true });
     if (error) { reportQueryError(`articles by ${slug}`, error); return []; }
-    return data.map(row => toStory(row));
+    return toStories(data);
   } catch (error) {
     reportQueryError(`articles by ${slug}`, { message: error instanceof Error ? error.message : "unexpected database error" });
     return [];
   }
 });
 
-export const getAuthorBySlug = cache(async (slug: string): Promise<Person | null> => {
-  const supabase = createSupabaseServerClient();
-  if (!supabase) return null;
-
+export const getProfileBySlug = cache(async (slug: string): Promise<ContributorProfile | null> => {
   try {
-    const { data, error } = await supabase.from("authors").select("*").eq("slug", slug).eq("is_public", true).maybeSingle();
-    if (error) { reportQueryError(`author ${slug}`, error); return null; }
-    return data ? toPerson(data) : null;
+    const data = await getPublicProfile(slug);
+    return data ? toContributorProfile(data) : null;
   } catch (error) {
-    reportQueryError(`author ${slug}`, { message: error instanceof Error ? error.message : "unexpected database error" });
+    reportQueryError(`profile ${slug}`, { message: error instanceof Error ? error.message : "unexpected database error" });
     return null;
   }
 });
 
-export const getPeople = cache(async (): Promise<Person[]> => {
+export const getPublicProfiles = cache(async (): Promise<ContributorProfile[]> => {
   const supabase = createSupabaseServerClient();
   if (!supabase) return [];
 
   try {
-    const { data, error } = await supabase.from("authors").select("*").eq("is_public", true).order("name");
-    if (error) { reportQueryError("people", error); return []; }
-    return data.map(toPerson);
+    const { data, error } = await supabase.from("public_profiles").select("id,slug,display_name,role_title,bio,avatar_url,seo_description").order("display_name");
+    if (error) { reportQueryError("public profiles", error); return []; }
+    return data.map(toContributorProfile);
   } catch (error) {
-    reportQueryError("people", { message: error instanceof Error ? error.message : "unexpected database error" });
+    reportQueryError("public profiles", { message: error instanceof Error ? error.message : "unexpected database error" });
     return [];
   }
 });

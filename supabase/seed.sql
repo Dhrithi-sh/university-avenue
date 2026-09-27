@@ -7,25 +7,12 @@ insert into public.sections (slug, name, sort_order, is_active) values
   ('opportunities', 'Opportunities', 5, true)
 on conflict (slug) do update set name = excluded.name, sort_order = excluded.sort_order, is_active = excluded.is_active, updated_at = now();
 
-insert into public.authors (slug, name, role_title, bio, photo_url, email, seo_description, is_public) values
-  (
-    'dhrithi-shashibushan',
-    'Dhrithi Shashibushan',
-    'Founder · University Avenue',
-    E'Hello, I’m Dhrithi.\n\nI study Computer Science and Engineering at SNU, and I’m passionate about bringing you fun and interesting stories from campus. I like looking at university life through a candid lens — the people, the infrastructure, and everything in between. And, might I say, it’s pretty beautiful.',
-    null,
-    null,
-    'Founder of University Avenue, an independent university journal beginning at Shiv Nadar University.',
-    true
-  )
-on conflict (slug) do update set name = excluded.name, role_title = excluded.role_title, bio = excluded.bio, photo_url = excluded.photo_url, email = excluded.email, seo_description = excluded.seo_description, is_public = excluded.is_public, updated_at = now();
-
 insert into public.articles (
   slug, title, dek, excerpt, body, published_at, read_time_minutes, image_url, image_alt,
-  section_id, author_id, is_featured, sort_order, is_sample, status, seo_title, seo_description
+  section_id, owner_profile_id, is_featured, sort_order, is_sample, status, seo_title, seo_description
 )
 select source.slug, source.title, source.dek, null, source.body, source.published_at::timestamptz,
-  source.read_time_minutes, source.image_url, source.image_alt, section.id, author.id,
+  source.read_time_minutes, source.image_url, source.image_alt, section.id, profile.id,
   source.is_featured, source.sort_order, true, 'published', null, null
 from (values
   (
@@ -91,8 +78,8 @@ from (values
   )
 ) as source(slug, title, dek, body, published_at, read_time_minutes, image_url, image_alt, section_slug, is_featured, sort_order)
 join public.sections section on section.slug = source.section_slug
-cross join public.authors author
-where author.slug = 'dhrithi-shashibushan'
+cross join public.profiles profile
+where profile.slug = 'dhrithi-shashibushan'
 on conflict (slug) do update set
   title = excluded.title,
   dek = excluded.dek,
@@ -103,7 +90,7 @@ on conflict (slug) do update set
   image_url = excluded.image_url,
   image_alt = excluded.image_alt,
   section_id = excluded.section_id,
-  author_id = excluded.author_id,
+  owner_profile_id = excluded.owner_profile_id,
   is_featured = excluded.is_featured,
   sort_order = excluded.sort_order,
   is_sample = excluded.is_sample,

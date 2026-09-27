@@ -9,7 +9,6 @@ const messages: Record<string, string> = {
   "story-text": "Add at least one paragraph of story text before submitting.",
   "not-editable": "That story is unavailable or can no longer be edited.",
   admin: "You need an active administrator account to use the editorial desk.",
-  author: "Choose an existing public author before publishing.",
   delete: "That story could not be deleted. Check its status and try again.",
   "note-length": "Reviewer notes must be 5,000 characters or fewer.",
   "note-required": "Add a note to explain the requested changes.",
@@ -37,7 +36,6 @@ const notices: Record<string, string> = {
   archived: "The story has been archived and removed from public listings.",
   rejected: "The story has been marked as rejected.",
   "changes-requested": "Changes have been requested. The contributor can now revise the story.",
-  "author-mapped": "The contributor’s public byline has been saved.",
   deleted: "The story and its editorial history have been permanently deleted.",
 };
 

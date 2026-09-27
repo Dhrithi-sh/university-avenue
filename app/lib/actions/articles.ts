@@ -110,7 +110,7 @@ export async function saveDraft(formData: FormData): Promise<void> {
 
   if (error || !data) {
     console.error("[University Avenue] Could not save article draft:", error);
-    redirect("/contribute?error=not-editable");
+    redirect(`/contribute/${id}/edit?error=not-editable`);
   }
   redirect(`/contribute/${id}/edit?notice=draft-saved`);
 }
@@ -148,14 +148,11 @@ export async function reviewArticle(formData: FormData): Promise<void> {
   const { error } = await supabase.rpc("editorial_review_article", {
     target_article_id: id,
     decision,
-    target_author_id: null,
     reviewer_note: note || null,
   });
   if (error) {
     console.error("[University Avenue] Editorial decision failed:", error);
-    const errorCode = error.message.toLowerCase().includes("public byline") || error.message.toLowerCase().includes("public author")
-      ? "author"
-      : error.message.toLowerCase().includes("reviewer note") ? "note-required" : "review";
+    const errorCode = error.message.toLowerCase().includes("reviewer note") ? "note-required" : "review";
     redirect(`/admin/articles/${id}?error=${errorCode}`);
   }
 
@@ -165,32 +162,6 @@ export async function reviewArticle(formData: FormData): Promise<void> {
   revalidatePath("/");
   revalidatePath("/sitemap.xml");
   redirect(`/admin?notice=${decision === "changes_requested" ? "changes-requested" : decision}`);
-}
-
-export async function setContributorAuthor(formData: FormData): Promise<void> {
-  const { profile, supabase } = await contributorContext();
-  const articleId = value(formData, "article_id");
-  const profileId = value(formData, "profile_id");
-  const authorId = value(formData, "author_id");
-  if (profile.role !== "admin") redirect("/contribute?error=admin-required");
-  if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(articleId)
-    || !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(profileId)
-    || (authorId && !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(authorId))) {
-    redirect("/admin?error=author");
-  }
-
-  const { error } = await supabase.rpc("set_contributor_author", {
-    target_profile_id: profileId,
-    target_author_id: authorId || null,
-  });
-  if (error) {
-    console.error("[University Avenue] Could not update contributor author mapping:", error);
-    redirect(`/admin/articles/${articleId}?error=author`);
-  }
-  revalidatePath("/admin");
-  revalidatePath(`/admin/articles/${articleId}`);
-  revalidatePath("/contribute");
-  redirect(`/admin/articles/${articleId}?notice=author-mapped`);
 }
 
 export async function deleteArticle(formData: FormData): Promise<void> {

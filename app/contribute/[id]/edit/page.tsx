@@ -24,7 +24,7 @@ export default async function EditStoryPage({ params, searchParams }: { params: 
   if (!supabase || !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(id)) notFound();
 
   const { data: article, error } = await supabase.from("articles")
-    .select("id,title,slug,dek,body,section_id,image_url,image_alt,author_id,published_at,status,updated_at")
+    .select("id,title,slug,dek,body,section_id,image_url,image_alt,published_at,status,updated_at")
     .eq("id", id).eq("owner_profile_id", profile.id).maybeSingle();
   if (error) console.error("[University Avenue] Could not load contributor article:", error);
   if (!article) notFound();
@@ -32,12 +32,10 @@ export default async function EditStoryPage({ params, searchParams }: { params: 
   const editable = article.status === "draft" || article.status === "changes_requested";
   const sectionSlug = sections.find(section => section.id === article.section_id)?.slug ?? "";
   const storySections = sections.filter(section => ["snu", "people", "ideas", "opportunities"].includes(section.slug));
-  const [historyResult, authorResult] = await Promise.all([
-    !editable ? supabase.from("article_review_notes").select("id,decision,note,created_at").eq("article_id", article.id).order("created_at", { ascending: true }) : Promise.resolve({ data: [], error: null }),
-    article.author_id ? supabase.from("authors").select("name,slug").eq("id", article.author_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
-  ]);
+  const historyResult = !editable
+    ? await supabase.from("article_review_notes").select("id,decision,note,created_at").eq("article_id", article.id).order("created_at", { ascending: true })
+    : { data: [], error: null };
   if (historyResult.error) console.error("[University Avenue] Could not load contributor article history:", historyResult.error);
-  if (authorResult.error) console.error("[University Avenue] Could not load contributor story byline:", authorResult.error);
   return <Shell><main className="wrap writing-page">
     <Link className="writing-back" href="/contribute">← Your stories</Link>
     <header className="writing-heading"><Eyebrow>{labels[article.status].toUpperCase()}</Eyebrow><h1>{editable ? article.title || "Untitled story" : article.title || "Story submitted"}</h1><p>{article.status === "pending_review" ? "Your story is with the editors. It is locked while they review it." : article.status === "changes_requested" ? "The editors have asked for changes. Make your revisions and send it back when it’s ready." : editable ? "You can keep working on this draft, or submit it when it’s ready." : "This story is read only."}</p></header>
@@ -52,7 +50,7 @@ export default async function EditStoryPage({ params, searchParams }: { params: 
       <div className="writing-actions"><button className="button" type="submit">Save draft <span>↗</span></button><button className="button writing-submit" type="submit" formAction={submitForReview}>Submit for review <span>↗</span></button><p>Submission requires a title, dek and at least one paragraph. Once submitted, the story is locked during review.</p></div>
     </form> : <>
       <section className="writing-locked"><span className={`submission-status status-${article.status.replaceAll("_", "-")}`}>{labels[article.status]}</span><p>{article.status === "pending_review" ? "You can’t edit a story while it is in review." : "This story is read only. Its editorial notes and full text remain here for reference."}</p>
-        {authorResult.data && <p className="writing-publication">By <Link href={`/authors/${authorResult.data.slug}`}>{authorResult.data.name}</Link>{article.status === "published" && <> · Published {article.published_at ? new Intl.DateTimeFormat("en", { dateStyle: "long" }).format(new Date(article.published_at)) : ""}</>}</p>}
+        <p className="writing-publication">By <Link href={`/authors/${profile.slug}`}>{profile.display_name}</Link>{article.status === "published" && <> · Published {article.published_at ? new Intl.DateTimeFormat("en", { dateStyle: "long" }).format(new Date(article.published_at)) : ""}</>}</p>
         {article.image_url && <figure className="writing-image-preview"><div role="img" aria-label={article.image_alt || article.title || "Featured story image"} style={{ backgroundImage: `url("${article.image_url}")` }}/>{article.image_alt?.trim() && <figcaption>{article.image_alt}</figcaption>}</figure>}
         <h2>{article.title || "Untitled story"}</h2><p className="writing-preview-dek">{article.dek}</p>
         <div className="writing-preview-body">{paragraphText(article.body).split("\n\n").filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
