@@ -10,8 +10,11 @@ const messages: Record<string, string> = {
   "not-editable": "That story is unavailable or can no longer be edited.",
   admin: "You need an active administrator account to use the editorial desk.",
   delete: "That story could not be deleted. Check its status and try again.",
+  "listing-delete": "That listing could not be deleted. Refresh the page and try again.",
   "note-length": "Reviewer notes must be 5,000 characters or fewer.",
   "note-required": "Add a note to explain the requested changes.",
+  "sample-protected": "Sample listings are retained for visual testing and cannot be deleted.",
+  "not-found": "That listing is unavailable or no longer exists.",
   review: "That editorial action could not be completed. Check the story status and try again.",
   "admin-required": "This page is for University Avenue administrators.",
   configuration: "Authentication is temporarily unavailable. Please try again later.",
@@ -37,6 +40,8 @@ const notices: Record<string, string> = {
   rejected: "The story has been marked as rejected.",
   "changes-requested": "Changes have been requested. The contributor can now revise the story.",
   deleted: "The story and its editorial history have been permanently deleted.",
+  created: "Listing created.",
+  updated: "Listing updated.",
 };
 
 export function AuthNotice({ error, notice }: { error?: string; notice?: string }) {

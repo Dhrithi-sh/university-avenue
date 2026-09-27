@@ -5,6 +5,7 @@ import { Eyebrow, Shell } from "../components/site";
 import { getCurrentProfile } from "../lib/auth";
 import { createSupabaseAuthServerClient } from "../lib/supabase/server";
 import type { ContentStatus } from "../lib/database.types";
+import { AdminNavigation } from "./admin-navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return <Shell><main className="wrap contributor-page admin-page">
     <header className="contributor-heading"><div><Eyebrow>EDITORIAL DESK · {profile.display_name.toUpperCase()}</Eyebrow><h1>Review queue.</h1><p>Stories sent in by contributors, ready for an editorial decision.</p></div></header>
+    <AdminNavigation active="stories"/>
     <AuthNotice error={queryError ? "load" : params.error} notice={params.notice}/>
     <section className="contributor-list" aria-labelledby="pending-heading">
       <div className="contributor-list-heading"><h2 id="pending-heading">Pending review</h2><span>{pending.length} {pending.length === 1 ? "story" : "stories"}</span></div>
