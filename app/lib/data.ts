@@ -32,7 +32,7 @@ function toStory(row: ArticleRecord): Story {
     date: date ? new Intl.DateTimeFormat("en-US", { month: "long", day: "2-digit", year: "numeric", timeZone: "UTC" }).format(date) : "",
     read: row.read_time_minutes ? `${row.read_time_minutes} min read` : "",
     image: row.image_url ?? "",
-    imageAlt: row.image_alt ?? row.title,
+    imageAlt: row.image_alt ?? "",
     author: row.author.name,
     authorSlug: row.author.slug,
     body: paragraphs,
@@ -205,7 +205,7 @@ export const getSections = cache(async (): Promise<Section[]> => {
   if (!supabase) return [];
 
   try {
-    const { data, error } = await supabase.from("sections").select("slug,name").eq("is_active", true).order("sort_order");
+    const { data, error } = await supabase.from("sections").select("id,slug,name").eq("is_active", true).order("sort_order");
     if (error) { reportQueryError("sections", error); return []; }
     return data;
   } catch (error) {

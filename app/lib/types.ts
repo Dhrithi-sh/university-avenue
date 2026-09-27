@@ -50,4 +50,4 @@ export type Opportunity = {
   isSample: boolean;
 };
 
-export type Section = { slug: string; name: string };
+export type Section = { id: string; slug: string; name: string };
