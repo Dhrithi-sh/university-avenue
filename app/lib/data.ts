@@ -72,7 +72,23 @@ function toEvent(row: Tables<"events">): Event {
   const month = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(date).toUpperCase();
   const start = row.start_time ? formatTime(row.start_time) : "";
   const detail = [row.location, start].filter(Boolean).join(" · ");
-  return { day: String(dayNumber).padStart(2, "0"), month, title: row.title, detail, type: row.category };
+  const end = row.end_time ? formatTime(row.end_time) : "";
+  const time = [start, end].filter(Boolean).join("–");
+  return {
+    day: String(dayNumber).padStart(2, "0"),
+    month,
+    date: new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date),
+    title: row.title,
+    detail,
+    type: row.category,
+    time,
+    location: row.location,
+    organizer: row.organizer,
+    description: row.description,
+    eventUrl: row.event_url,
+    imageUrl: row.image_url,
+    isSample: row.is_sample,
+  };
 }
 
 function formatTime(time: string): string {
